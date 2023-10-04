@@ -1,0 +1,132 @@
+---
+title: "Exploratory Analysis Script"
+output: html_document
+date: "2023-04-26"
+---
+Description: This markdown file contains the script used to conduct the exploratory analyses described in the study
+```{r}
+# Install packages
+install.packages("htmltools")
+install.packages("hrbrthemes")
+install.packages("ggplot2")
+install.packages("viridis")
+install.packages("Hmisc")
+install.packages("corrplot")
+install.packages("ggcorrplot")
+install.packages("moments")
+install.packages("plotrix")
+install.packages("forcats")
+
+# Load packages
+library("htmltools")
+library("hrbrthemes")
+library("ggplot2")
+library("viridis")
+library("Hmisc")
+library("corrplot")
+library("ggcorrplot")
+library("moments")
+library("plotrix")
+library("forcats")
+```
+
+```{r}
+# Import data (Cleaned via Data Cleaning Script.rmd)
+data_for_analysis <- read.csv("/Users/davidfeng/Desktop/OneDrive/PBS/LT/PB310/Data/Data for Analysis.csv")
+```
+
+```{r}
+# Sample size, by country
+tapply(data_for_analysis$CountryCode, data_for_analysis$CountryCode, length)
+```
+
+```{r}
+# Count of total country-specific religions
+distinct_religions <- n_distinct(data_for_analysis$ReligiousDenominationCS)
+distinct_religions - 5 # subtract out unspecified data
+```
+
+```{r}
+# Calculate VIF to detect multicolinearity
+vifmodel <- lm(Trust ~ ReligiousMembership + Gender + Age + EducationalAttainment + Income + GDPpercapita + IndividualFreedom + PoliticalStability, data = data_for_analysis)
+
+vif(vifmodel)
+```
+
+```{r}
+# Get descriptive statistics
+skewness(numeric_variables)
+kurtosis(numeric_variables)
+std.error(numeric_variables)
+sd(numeric_variables$Religiosity)
+sd(numeric_variables$Trust)
+sd(numeric_variables$PoliticalStability)
+
+summary(numeric_variables)
+```
+
+```{r}
+# Correlation matrix for numeric variables
+select <- c("Religiosity", "Trust", "PoliticalStability", "GDPpercapita", "IndividualFreedom", "Age", "EducationalAttainment", "Income")
+
+numeric_variables <- data_for_analysis[select]
+
+correlation.matrix <-cor(numeric_variables, method = c("pearson"))
+
+rcorr.matrix <- rcorr(as.matrix(numeric_variables))
+rcorr.matrix
+
+rcorr.coefficients <- rcorr.matrix$r
+rcorr.pvalues <- rcorr.matrix$P
+
+correlationmatrix <- corrplot(correlation.matrix, order = "hclust", type = "lower", diag = FALSE, tl.col = "black", cl.ratio = 0.2, tl.srt = 45, col = COL2("RdBu", 10), addCoef.col = "black", number.cex = 1.5, insig = "blank", tl.cex = 1.7)
+```
+
+```{r}
+# Bar plot of major religious denominations
+select_denomination <- c("ReligiousDenomination", "CountryCodeAlpha")
+denomination_variables <- data_for_analysis[select_denomination]
+denomination_variables$ReligiousDenomination_Character = NA
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '1'] <- 'Roman Catholic'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '0'] <- 'Do not belong'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '2'] <- 'Protestant'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '3'] <- 'Orthodox (Russian/Greek/etc)'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '4'] <- 'Jew'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '5'] <- 'Muslim'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '6'] <- 'Hindu'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '7'] <- 'Buddhist'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '8'] <- 'Other Christian'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '9'] <- 'Other'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '-1'] <- 'Data Not Available'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '-2'] <- 'Data Not Available'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '-5'] <- 'Data Not Available'
+
+denomination_variables['ReligiousDenomination_Character'][denomination_variables['ReligiousDenomination'] == '-4'] <- 'Data Not Available'
+
+denomination_ordered <- denomination_variables %>%
+  mutate(ReligiousDenomination_Character = fct_relevel(ReligiousDenomination_Character, 'Jew', 'Hindu', 'Data Not Available', 'Other', 'Other Christian', 'Buddhist', 'Orthodox (Russian/Greek/etc)', 'Protestant', 'Roman Catholic', 'Do not belong', 'Muslim'))
+
+ggplot(denomination_ordered, aes(x = ReligiousDenomination_Character)) +
+  geom_bar(width = 0.5, fill = "#69b3a2", color = "black") +
+  coord_flip() +
+  xlab("Major Religious Denominations") +
+  theme_ipsum(base_size = 16, axis_text_size = 16, axis_title_size = 16, axis_title_face = "bold")
+```
+
+
+
+
+
