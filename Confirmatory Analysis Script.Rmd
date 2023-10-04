@@ -1,0 +1,89 @@
+---
+title: "Confirmatory Analysis Script"
+output: html_document
+date: "2023-04-26"
+---
+Description: This markdown file contains the script for the confirmatory analyses implemented in the study.
+```{r}
+# Install packages
+install.packages("lme4")
+install.packages("ggplot2")
+install.packages("car")
+install.packages("interactions")
+
+# Load packages
+library("lme4")
+library("ggplot2")
+library("car")
+library("interactions")
+```
+
+```{r}
+# Import data (cleaned via Data Cleaning Script.rmd)
+data_for_analysis <- read.csv("/Users/davidfeng/Desktop/OneDrive/PBS/LT/PB310/Data/Data for Analysis.csv")
+```
+
+Analysis 1: Regression model
+```{r}
+# Fit regression
+regression.model <- lm(Trust ~ ReligiousMembership, data = data_for_analysis)
+summary(regression.model)
+
+# Fit regression with controls
+regression.model.control <- lm(Trust ~ ReligiousMembership + Gender + Age + EducationalAttainment + Income + GDPpercapita + IndividualFreedom, data = data_for_analysis)
+summary(regression.model.control)
+
+# Bootstrap confidence intervals
+regression.boot <- Boot(regression.model.control, f = coef, R = 5000)
+confint(regression.boot, level = .95, type = "norm")
+```
+
+```{r}
+# Check model assumptions
+plot(regression.model.control)
+```
+
+Analysis 2: Multi-level model
+```{r}
+# Grand mean center predictor and outcome variables using the Z-score (scores represent deviations of each person's religiosity and political stability score from the overall sample means)
+Religiositymean <- mean(data_for_analysis$Religiosity)
+Religiositysd <- sd (data_for_analysis$Religiosity)
+
+PoliticalStabilitymean <- mean(data_for_analysis$PoliticalStability)
+PoliticalStabilitysd <- sd(data_for_analysis$PoliticalStability)
+
+data_for_analysis <- data_for_analysis %>%
+  mutate(Religiosity.C = (Religiosity - Religiositymean)/Religiositysd) %>%
+  mutate(PoliticalStability.C = (PoliticalStability - PoliticalStabilitymean)/PoliticalStabilitysd)
+
+# Empty model
+empty.cooperation.fit <- lmer(formula = Trust ~ 1 + (1|PoliticalStability.C), data = data_for_analysis, REML = FALSE)
+
+# Summarise model
+summary(empty.cooperation.fit)
+
+# Intraclass correlation coefficient, calculated by variance between countries / total variance
+0.09565/(0.09565+0.64439)
+```
+
+```{r}
+# Add level 2 predictor of religiosity to empty model
+multilevel.model <- lmer(formula = Trust ~ 1 + Religiosity.C + PoliticalStability.C + Religiosity.C*PoliticalStability.C + (1 + Religiosity.C|PoliticalStability.C), data = data_for_analysis, REML = FALSE)
+
+# Summarise model
+summary(multilevel.model)
+
+# Add controls
+multilevel.model.control <- lmer(formula = Trust ~ 1 + Gender + Age + EducationalAttainment + Income + GDPpercapita + IndividualFreedom + Religiosity.C + PoliticalStability.C + Religiosity.C*PoliticalStability.C + (1 + Religiosity.C|PoliticalStability.C), data = data_for_analysis, REML = FALSE)
+
+summary(multilevel.model.control)
+
+# Bootstrap confidence intervals
+confint(multilevel.model.control, method = "boot", nsim = 5000)
+```
+
+Probe the interaction
+```{r}
+# Johnson-Neyman method
+johnson_neyman(model = multilevel.model.control, pred = Religiosity.C, modx = PoliticalStability.C)
+```
